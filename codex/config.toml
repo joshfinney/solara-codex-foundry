@@ -1,0 +1,38 @@
+[project]
+name = "Solara Chat POC"
+goal = "Read Solara’s code from site-packages, derive first-principles usage, and scaffold a zero-flicker chat POC matching docs/PRD.md."
+
+[prompt]
+bootstrap = "codex/prompts/bootstrap.md"
+
+[policies]
+require_confirm_before_shell = true
+max_shell_seconds = 120
+allow_commit_push = true
+forbid_network = false  # We want code-reading, not web surfing.
+
+# === Capabilities via MCP ===
+
+# Files: project + site-packages (read-only outside repo)
+[[mcp]]
+name = "filesystem"
+type = "builtin:filesystem"
+# Root repo; Codex will discover site-packages via a helper task (below).
+config.root = "./"
+
+# Shell in safe mode with a tight allowlist
+[[mcp]]
+name = "shell"
+type = "builtin:shell"
+config.safe_mode = true
+config.allowed = ["uv", "python", "pytest", "ruff", "git", "grep", "rg", "ls", "find", "sed", "awk"]
+
+# Git operations for atomic commits/PRs
+[[mcp]]
+name = "git"
+type = "builtin:git"
+config.repo_path = "./"
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["@playwright/mcp@latest"]

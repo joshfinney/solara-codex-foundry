@@ -1,0 +1,7 @@
+- Message is an ordered list of blocks: Text, Image(path), Table(dataframe-like), Integer, and Metadata (generated code).
+- Per-message toolbar: [View Code][Feedback].
+- Code view is collapsible; expansion should not shift sibling messages; use height transitions or anchored overlays without relayout cascade.
+- Thinking bubble: modern, subtle animated dots; does not push layout around.
+- Multi-line input with Shift+Enter newline; Enter to send.
+- Attestation gate: if not accepted, show modal on first app open; persist acceptance in storage/attestations.jsonl; abstract storage so it can be replaced later.
+- Streaming-ready: design API so text can append incrementally without remounting the message.

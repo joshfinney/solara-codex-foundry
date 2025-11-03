@@ -1,0 +1,21 @@
+[project]
+name = "solara-codex-foundry"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "solara>=1.54.0",
+    "fastapi>=0.121.0",
+    "uvicorn>=0.38.0",
+    "loguru>=0.7.3",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "httpx>=0.28.1",
+    "ruff>=0.14.3",
+    "mypy>=1.18.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

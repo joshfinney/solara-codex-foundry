@@ -1,0 +1,14 @@
+{
+  "Getting Started": [
+    "Explain Solara reactive state in simple terms",
+    "Generate a TODO app scaffold using Solara components"
+  ],
+  "Debugging": [
+    "Why is my component re-rendering twice?",
+    "Suggest ways to avoid flicker in chat UIs"
+  ],
+  "Creative": [
+    "Write a productivity prompt with Solara",
+    "Design a layout for AI assistant replies"
+  ]
+}

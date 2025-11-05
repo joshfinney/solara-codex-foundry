@@ -91,17 +91,24 @@ def _WorkspaceShell(
             "maxWidth": "1440px",
             "margin": "0 auto",
             "gap": "1rem",
-            "paddingTop": "1rem",
+            "padding": "1rem 0 1.5rem",
+            "boxSizing": "border-box",
+            "width": "100%",
+            "flex": "1 1 auto",
         },
     ):
-        header.AppHeader(controller, current_path)
-        workspace.WorkspaceToolbar(controller)
-        if session_state.bootstrapping and not session_state.ready:
-            solara.ProgressLinear(indeterminate=True)
-            solara.Text(session_state.loading_label, classes=["caption"])
-        else:
-            render_content()
-        workspace.AppFooter(controller)
+        with solara.Div(classes=["pc-workspace-section", "pc-workspace-section--flush"]):
+            header.AppHeader(controller, current_path)
+        with solara.Div(classes=["pc-workspace-section"]):
+            workspace.WorkspaceToolbar(controller)
+        with solara.Div(classes=["pc-workspace-section", "pc-workspace-content"]):
+            if session_state.bootstrapping and not session_state.ready:
+                solara.ProgressLinear(indeterminate=True)
+                solara.Text(session_state.loading_label, classes=["caption"])
+            else:
+                render_content()
+        with solara.Div(classes=["pc-workspace-section", "pc-workspace-section--flush"]):
+            workspace.AppFooter(controller)
 
 
 def _make_route(path: str, name: str) -> solara.Route:

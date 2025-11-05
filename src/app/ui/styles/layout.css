@@ -1,3 +1,12 @@
+/*
+ * Solara injects a Vuetify app bar for routing metadata which shows up as a
+ * primary-coloured header. The application renders its own header via
+ * ``AppHeader`` so we hide the default bar to avoid the duplicate blue bar.
+ */
+.v-application--wrap > header.v-app-bar {
+  display: none !important;
+}
+
 .pc-header {
   background: #ffffff;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);

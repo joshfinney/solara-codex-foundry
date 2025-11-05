@@ -1,0 +1,51 @@
+.pc-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pc-table th,
+.pc-table td {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.pc-table-wrapper {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.pc-workspace {
+  color: #222;
+}
+
+.status-chip {
+  margin-left: 0.5rem;
+}
+
+.pc-app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+}
+
+.chat-stage {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.conversation-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding-bottom: 0.5rem;
+}
+
+.chat-composer textarea {
+  width: 100%;
+}
+
+.chat-empty {
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+}

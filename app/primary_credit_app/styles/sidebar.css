@@ -1,0 +1,32 @@
+.pc-shell {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background: #f4f6fb;
+}
+
+.pc-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  max-width: 90vw;
+  height: 100vh;
+  background: #ffffff;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.08);
+  transform: translateX(100%);
+  transition: transform 240ms ease-in-out;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  box-sizing: border-box;
+  z-index: 20;
+}
+
+.pc-sidebar.open {
+  transform: translateX(0);
+}
+
+.pc-sidebar.closed {
+  pointer-events: none;
+}

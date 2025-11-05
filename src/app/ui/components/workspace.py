@@ -60,6 +60,11 @@ def WorkspaceToolbar(controller: AppController) -> None:
                 step=1,
                 on_value=lambda value: controller.set_lookback_days(int(value)),
                 classes=["pc-toolbar-slider"],
+                style={
+                    "width": "25%",
+                    "minWidth": "220px",
+                    "maxWidth": "320px",
+                },
             )
         with solara.Row(
             classes=["pc-toolbar-right"],

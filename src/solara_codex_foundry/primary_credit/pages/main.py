@@ -8,7 +8,7 @@ from pathlib import Path
 
 import solara
 
-from app.components.chat import attestation, backend, state as chat_state
+from solara_codex_foundry.chat import attestation, backend, state as chat_state
 
 from ..components import feedback, grid, header, panels, sidebar
 from ..core import gates, styles
@@ -16,7 +16,7 @@ from ..core.state import AppController
 from ..services.logging import StructuredLogger
 from ..services.storage import StorageClient
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 ATTESTATION_FILE = PROJECT_ROOT / "storage" / "attestation_state.json"
 PROMPT_SUGGESTIONS_FILE = PROJECT_ROOT / "storage" / "prompt_suggestions.json"
 

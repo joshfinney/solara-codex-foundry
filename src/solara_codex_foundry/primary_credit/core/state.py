@@ -10,7 +10,7 @@ from typing import Dict, Optional
 
 import solara
 
-from app.components.chat import state as chat_state
+from solara_codex_foundry.chat import state as chat_state
 
 from ..services import tasks
 from ..services.credentials import RuntimeCredentials

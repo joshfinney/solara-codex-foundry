@@ -1,2 +1,5 @@
-def hello() -> str:
-    return "Hello from solara-codex-foundry!"
+"""Solara Codex Foundry application and component packages."""
+
+from . import chat, primary_credit
+
+__all__ = ["chat", "primary_credit"]

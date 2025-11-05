@@ -1,4 +1,4 @@
-from app.components.chat import attestation, backend, models, state
+from solara_codex_foundry.chat import attestation, backend, models, state
 
 
 def make_controller(initial_attested: bool | None = True):

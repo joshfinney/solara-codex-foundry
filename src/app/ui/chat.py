@@ -1,4 +1,4 @@
-# UI components composing the chat experience.
+"""Composable chat UI built with Solara components."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ from typing import Callable, Dict, Iterable, List, Optional
 import solara
 from solara.lab.components.chat import ChatMessage as LabChatMessage
 
-from . import models, state
+from app.models import chat as chat_models
+from app.state import ChatController
 
 MAX_VISIBLE_MESSAGES = 30
 OVERSCAN = 5
@@ -31,7 +32,7 @@ def _render_table(rows: Iterable[dict]) -> str:
 
 
 @solara.component
-def MessageBlockView(block: models.MessageBlock):
+def MessageBlockView(block: chat_models.MessageBlock):
     """Render a single message block without disrupting layout."""
 
     for part in block.parts:
@@ -57,7 +58,7 @@ def MessageBlockView(block: models.MessageBlock):
 
 
 @solara.component
-def CodePanel(msg: models.Message):
+def CodePanel(msg: chat_models.Message):
     expanded = not msg.toolbar_collapsed
     if not expanded or not msg.metadata.python_code:
         return
@@ -68,10 +69,10 @@ def CodePanel(msg: models.Message):
 
 @solara.component
 def FeedbackPanel(
-    msg: models.Message,
-    controller: state.ChatController,
-    draft: models.FeedbackDraft,
-    record: models.FeedbackRecord | None,
+    msg: chat_models.Message,
+    controller: ChatController,
+    draft: chat_models.FeedbackDraft,
+    record: chat_models.FeedbackRecord | None,
 ):
     if record is not None:
         with solara.Div(classes=["feedback-panel"], style={"width": "100%"}):
@@ -84,7 +85,7 @@ def FeedbackPanel(
         def update_minutes(value):
             controller.update_feedback_draft(
                 msg.id,
-                lambda current: models.FeedbackDraft(
+                lambda current: chat_models.FeedbackDraft(
                     minutes_saved=int(value),
                     score=current.score,
                     comments=current.comments,
@@ -94,7 +95,7 @@ def FeedbackPanel(
         def update_score(value):
             controller.update_feedback_draft(
                 msg.id,
-                lambda current: models.FeedbackDraft(
+                lambda current: chat_models.FeedbackDraft(
                     minutes_saved=current.minutes_saved,
                     score=int(value),
                     comments=current.comments,
@@ -104,7 +105,7 @@ def FeedbackPanel(
         def update_comments(value):
             controller.update_feedback_draft(
                 msg.id,
-                lambda current: models.FeedbackDraft(
+                lambda current: chat_models.FeedbackDraft(
                     minutes_saved=current.minutes_saved,
                     score=current.score,
                     comments=value,
@@ -124,14 +125,14 @@ def FeedbackPanel(
 
 
 @solara.component
-def MessageAssistantExtras(msg: models.Message, controller: state.ChatController):
+def MessageAssistantExtras(msg: chat_models.Message, controller: ChatController):
     if msg.role != "assistant":
         return
 
     chat_state = controller.state.use()
     feedback_open = chat_state.active_feedback_message_id == msg.id
     submitted_record = chat_state.feedback_submissions.get(msg.id)
-    draft = chat_state.feedback_drafts.get(msg.id, models.FeedbackDraft())
+    draft = chat_state.feedback_drafts.get(msg.id, chat_models.FeedbackDraft())
     code_open = not msg.toolbar_collapsed and bool(msg.metadata.python_code)
 
     def toggle_code():
@@ -163,7 +164,7 @@ def MessageAssistantExtras(msg: models.Message, controller: state.ChatController
 
 
 @solara.component
-def MessageView(msg: models.Message, controller: state.ChatController):
+def MessageView(msg: chat_models.Message, controller: ChatController):
     """Render a chat message with toolbar and optional code panel."""
 
     role_label = "You" if msg.role == "user" else "Assistant"
@@ -209,7 +210,7 @@ def PromptSuggestions(categories: Dict[str, List[str]], on_select: Callable[[str
 
 @solara.component
 def VirtualMessageList(
-    controller: state.ChatController,
+    controller: ChatController,
     on_prompt_select: Optional[Callable[[str], None]] = None,
     max_visible: int = MAX_VISIBLE_MESSAGES,
 ):
@@ -273,7 +274,7 @@ def VirtualMessageList(
 
 
 @solara.component
-def ChatInput(controller: state.ChatController, message_text: str, set_message_text: Callable[[str], None]):
+def ChatInput(controller: ChatController, message_text: str, set_message_text: Callable[[str], None]):
     is_pending = controller.state.use(lambda s: bool(s.pending_message_ids))
 
     def handle_send(*_ignore):
@@ -298,7 +299,7 @@ def ChatInput(controller: state.ChatController, message_text: str, set_message_t
 
 
 @solara.component
-def AttestationGate(controller: state.ChatController):
+def AttestationGate(controller: ChatController):
     attestation_state = controller.state.use(lambda s: s.attestation)
     if not attestation_state.required:
         return
@@ -313,7 +314,7 @@ def AttestationGate(controller: state.ChatController):
 
 
 @solara.component
-def ChatSurface(controller: state.ChatController):
+def ChatSurface(controller: ChatController):
     """High-level shell that decides whether to show attestation or chat UI."""
 
     attestation_state = controller.state.use(lambda s: s.attestation)

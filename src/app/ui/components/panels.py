@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import solara
 
-from ..core.state import AppController
+from app.state import AppController
 
 
 @solara.component

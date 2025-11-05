@@ -2,22 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
-
 import solara
 
-
-@dataclass
-class GateState:
-    """Minimal state required for the login/attestation flow."""
-
-    is_authenticated: bool = False
-    has_accepted_terms: bool = False
-    username: Optional[str] = None
-    attestation_message: str = (
-        "I confirm that I will validate AI output before using it for credit decisions."
-    )
+from app.models.app import GateState
 
 
 @solara.component

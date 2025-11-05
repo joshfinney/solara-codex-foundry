@@ -1,10 +1,10 @@
 # Debrief
 
 ## Architecture Highlights
-- Chat surface is composed through `app/components/chat/view.py`, which layers deterministic layout primitives (`solara.Card`, fixed paddings) to keep containers mounted and avoid reflow.
-- `ChatController` (`app/components/chat/state.py`) owns the reactive state bag (`ChatState`) and orchestrates backend calls, attestation persistence, and feedback submission. It exposes synchronous APIs so components can optimistically update UI while background tasks complete.
-- Data contracts live in `app/components/chat/models.py`, giving typed blocks (text, table, image path, integer) and message metadata with generated code. Tests exercise these contracts directly.
-- `MockChatBackend` (`app/components/chat/backend.py`) simulates a composite AI response, assembling heterogeneous blocks and code metadata without network calls. Static assets reside in `app/public/static`.
+- Chat surface is composed through `src/app/ui/chat.py`, which layers deterministic layout primitives (`solara.Card`, fixed paddings) to keep containers mounted and avoid reflow.
+- `ChatController` (`src/app/state/chat.py`) owns the reactive state bag (`ChatState`) and orchestrates backend calls, attestation persistence, and feedback submission. It exposes synchronous APIs so components can optimistically update UI while background tasks complete.
+- Data contracts live in `src/app/models/chat.py`, giving typed blocks (text, table, image path, integer) and message metadata with generated code. Tests exercise these contracts directly.
+- `MockChatBackend` (`src/app/services/chat_backend.py`) simulates a composite AI response, assembling heterogeneous blocks and code metadata without network calls. Static assets reside in `src/app/assets/static`.
 - Attestation storage is abstracted behind `AttestationStore`; the POC binds to `FileAttestationStore` targeting `storage/attestation_state.json`, while tests rely on the in-memory variant.
 
 ## Flicker & Reflow Mitigations
@@ -14,5 +14,5 @@
 - Input toolbar and feedback dialogs stay mounted; visibility toggles rely on component state instead of element churn, preventing re-render cascades.
 
 ## Testing Summary
-- `app/tests/test_chat_components.py` covers the PRD acceptance criteria: backend round-trips, code panel toggling stability, independent feedback submissions, and attestation persistence.
+- `tests/test_chat_components.py` covers the PRD acceptance criteria: backend round-trips, code panel toggling stability, independent feedback submissions, and attestation persistence.
 - `ruff check` and `pytest` both succeed locally (pytest runs in asyncio strict mode, ensuring async boundaries remain tight).

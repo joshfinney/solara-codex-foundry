@@ -1,63 +1,21 @@
-"""Reactive app state container and controller."""
+"""Primary Credit application controller and helpers."""
 
 from __future__ import annotations
 
 import asyncio
 import dataclasses
 import uuid
-from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Optional
 
 import solara
 
-from solara_codex_foundry.chat import state as chat_state
-
-from ..services import tasks
-from ..services.credentials import RuntimeCredentials
-from ..services.logging import StructuredLogger
-from ..services.storage import StorageClient
-from ..services.tasks import SessionTasks
-from . import gates
-
-
-@dataclass
-class SessionState:
-    bootstrapping: bool = False
-    ready: bool = False
-    error: str | None = None
-    loading_label: str = "Preparing workspace…"
-    celery_ready: bool = False
-    public_config: Dict[str, str] = field(default_factory=dict)
-
-
-@dataclass
-class DatasetState:
-    raw: tasks.DatasetResult | None = None
-    filtered: tasks.FilterResult | None = None
-    cache: Dict[int, tasks.FilterResult] = field(default_factory=dict)
-    lookback_days: int = 14
-    max_lookback_days: int = 60
-    cache_hits: int = 0
-    cache_misses: int = 0
-    last_duration_ms: int | None = None
-    last_cache_hit: bool = False
-
-
-@dataclass
-class UIState:
-    sidebar_open: bool = False
-    active_tab: str = "new_issues"
-    inline_feedback_text: str = ""
-    inline_feedback_status: str = "idle"
-    conversation_id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
-
-
-@dataclass
-class AppState:
-    gate: gates.GateState = field(default_factory=gates.GateState)
-    session: SessionState = field(default_factory=SessionState)
-    dataset: DatasetState = field(default_factory=DatasetState)
-    ui: UIState = field(default_factory=UIState)
+from app.models import app as app_models
+from app.models import dataset as dataset_models
+from app.services.credentials import RuntimeCredentials
+from app.services.logging import StructuredLogger
+from app.services.storage import StorageClient
+from app.services.tasks import SessionTasks
+from app.state.chat import ChatController
 
 
 class AppController:
@@ -66,14 +24,14 @@ class AppController:
     def __init__(
         self,
         *,
-        chat_controller: chat_state.ChatController,
+        chat_controller: ChatController,
         logger: StructuredLogger,
         storage_client: StorageClient,
     ) -> None:
         self.chat = chat_controller
         self.logger = logger
         self.tasks = SessionTasks(logger, storage_client)
-        self.state: solara.Reactive[AppState] = solara.reactive(AppState())
+        self.state: solara.Reactive[app_models.AppState] = solara.reactive(app_models.AppState())
         self._credentials: Optional[RuntimeCredentials] = None
         self._bootstrap_started = False
         self._bootstrap_inflight = False
@@ -96,14 +54,14 @@ class AppController:
 
     # ------------------------------------------------------------------ authentication gates
     def authenticate(self, username: str) -> None:
-        def updater(prev: AppState):
+        def updater(prev: app_models.AppState):
             gate = dataclasses.replace(prev.gate, is_authenticated=True, username=username)
             return {"gate": gate}
 
         self.state.update(updater)
 
     def accept_terms(self) -> None:
-        def updater(prev: AppState):
+        def updater(prev: app_models.AppState):
             gate = dataclasses.replace(prev.gate, has_accepted_terms=True)
             return {"gate": gate}
 
@@ -176,7 +134,8 @@ class AppController:
             return
 
         lookback = min(self.state.value.dataset.lookback_days, dataset.max_window_days)
-        def updater(prev: AppState):
+
+        def updater(prev: app_models.AppState):
             dataset_state = dataclasses.replace(
                 prev.dataset,
                 raw=dataset,
@@ -194,16 +153,22 @@ class AppController:
 
         self.state.update(updater)
         await self._apply_filter(lookback)
-        self.state.update(lambda prev: {"session": dataclasses.replace(prev.session, ready=True, loading_label="Workspace ready")})
+        self.state.update(
+            lambda prev: {
+                "session": dataclasses.replace(prev.session, ready=True, loading_label="Workspace ready"),
+            }
+        )
 
     async def _apply_filter(self, window_days: int) -> None:
         dataset = self.state.value.dataset.raw
         if dataset is None:
             return
+
         cached = self.state.value.dataset.cache.get(window_days)
         if cached is not None:
             cached_hit = dataclasses.replace(cached, cache_hit=True)
-            def updater(prev: AppState):
+
+            def cache_updater(prev: app_models.AppState):
                 new_cache = dict(prev.dataset.cache)
                 new_cache[window_days] = cached
                 dataset_state = dataclasses.replace(
@@ -218,7 +183,7 @@ class AppController:
                 return {"dataset": dataset_state}
 
             self.logger.info("dataset.filter.cache_hit", window_days=window_days, row_count=cached.row_count)
-            self.state.update(updater)
+            self.state.update(cache_updater)
             return
 
         self.state.update(lambda prev: {"dataset": dataclasses.replace(prev.dataset, lookback_days=window_days)})
@@ -228,7 +193,7 @@ class AppController:
             self.logger.error("dataset.filter.failed", window_days=window_days, error=str(error))
             return
 
-        def updater(prev: AppState):
+        def assign(prev: app_models.AppState):
             cache = dict(prev.dataset.cache)
             cache[window_days] = result
             dataset_state = dataclasses.replace(
@@ -248,7 +213,7 @@ class AppController:
             row_count=result.row_count,
             duration_ms=result.duration_ms,
         )
-        self.state.update(updater)
+        self.state.update(assign)
 
     # ------------------------------------------------------------------ UI interactions
     def set_active_tab(self, tab: str) -> None:
@@ -278,14 +243,14 @@ class AppController:
                 "ui": dataclasses.replace(prev.ui, inline_feedback_status="submitting")
             }
         )
-        payload = tasks.InlineFeedback(conversation_id=conversation_id, comments=comments)
+        payload = dataset_models.InlineFeedback(conversation_id=conversation_id, comments=comments)
         self._spawn(self._submit_inline_feedback(payload))
 
-    async def _submit_inline_feedback(self, payload: tasks.InlineFeedback) -> None:
+    async def _submit_inline_feedback(self, payload: dataset_models.InlineFeedback) -> None:
         try:
             await self.tasks.submit_inline_feedback(payload)
         finally:
-            def updater(prev: AppState):
+            def complete(prev: app_models.AppState):
                 return {
                     "ui": dataclasses.replace(
                         prev.ui,
@@ -295,7 +260,7 @@ class AppController:
                     )
                 }
 
-            self.state.update(updater)
+            self.state.update(complete)
             await asyncio.sleep(1.5)
             self.state.update(
                 lambda prev: {
@@ -319,7 +284,7 @@ class AppController:
         return raw.frame if raw else None
 
 
-def use_app_controller(controller: AppController) -> AppState:
+def use_app_controller(controller: AppController) -> app_models.AppState:
     """Convenience hook for reading the reactive app state."""
 
     return controller.state.use()

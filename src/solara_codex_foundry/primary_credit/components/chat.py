@@ -7,8 +7,8 @@ from typing import Callable
 
 import solara
 
-from app.components.chat import state as chat_state
-from app.components.chat import view as chat_view
+from solara_codex_foundry.chat import state as chat_state
+from solara_codex_foundry.chat import view as chat_view
 
 from ..services import telemetry
 

@@ -9,9 +9,9 @@ from pathlib import Path
 
 import solara
 
-from app.components.chat import attestation, backend, state, view
+from solara_codex_foundry.chat import attestation, backend, state, view
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 ATTESTATION_FILE = PROJECT_ROOT / "storage" / "attestation_state.json"
 PROMPT_SUGGESTIONS_FILE = PROJECT_ROOT / "storage" / "prompt_suggestions.json"
 

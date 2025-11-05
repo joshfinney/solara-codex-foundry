@@ -9,7 +9,9 @@ from pathlib import Path
 
 import solara
 
-from solara_codex_foundry.chat import attestation, backend, state, view
+from app.services import attestation, chat_backend
+from app.state import ChatController
+from app.ui import chat as chat_view
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 ATTESTATION_FILE = PROJECT_ROOT / "storage" / "attestation_state.json"
@@ -28,11 +30,11 @@ def load_prompt_suggestions() -> dict[str, list[str]]:
 @solara.component
 def Page():
     controller = solara.use_memo(
-        lambda: state.ChatController(
-            backend_client=backend.MockChatBackend(),
+        lambda: ChatController(
+            backend_client=chat_backend.MockChatBackend(),
             attestation_store=attestation.FileAttestationStore(ATTESTATION_FILE),
             prompt_categories=load_prompt_suggestions(),
         ),
         [],
     )
-    view.ChatSurface(controller)
+    chat_view.ChatSurface(controller)

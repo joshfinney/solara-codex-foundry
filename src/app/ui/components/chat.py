@@ -7,10 +7,9 @@ from typing import Callable
 
 import solara
 
-from solara_codex_foundry.chat import state as chat_state
-from solara_codex_foundry.chat import view as chat_view
-
-from ..services import telemetry
+from app.state import ChatController
+from app.ui import chat as chat_view
+from app.services import telemetry
 
 
 @solara.component
@@ -68,7 +67,7 @@ def EmptyState(prompt_categories: dict[str, list[str]], on_select: Callable[[str
 
 
 @solara.component
-def SidebarChatSurface(controller: chat_state.ChatController, conversation_id: str):
+def SidebarChatSurface(controller: ChatController, conversation_id: str):
     chat_state_value = controller.state.use()
     composer_text, set_composer_text = solara.use_state("", key="pc-chat-composer")
     pending = bool(chat_state_value.pending_message_ids)
@@ -111,5 +110,5 @@ def SidebarChatSurface(controller: chat_state.ChatController, conversation_id: s
 
 
 @solara.component
-def ChatSidebar(controller: chat_state.ChatController, conversation_id: str):
+def ChatSidebar(controller: ChatController, conversation_id: str):
     SidebarChatSurface(controller, conversation_id)

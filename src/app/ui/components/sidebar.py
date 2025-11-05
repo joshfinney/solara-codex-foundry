@@ -6,8 +6,8 @@ from typing import Callable
 
 import solara
 
-from ..core import styles
-from ..core.state import AppController
+from app.core import styles
+from app.state import AppController
 from . import chat
 
 

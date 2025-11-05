@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import solara
 
-from ..core.state import AppController
+from app.state import AppController
 
 
 @dataclass(frozen=True)

@@ -7,8 +7,8 @@ from typing import Iterable
 
 import solara
 
-from ..core import optional_dependencies
-from ..core.state import AppController
+from app.core import optional_dependencies
+from app.state import AppController
 
 
 def _render_table(rows: Iterable[dict]) -> str:

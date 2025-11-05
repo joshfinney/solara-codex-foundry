@@ -6,10 +6,11 @@ import asyncio
 import datetime as _dt
 import io
 import random
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Iterable
 
-from ..core import optional_dependencies
+from app.core import optional_dependencies
+from app.models import dataset as dataset_models
+
 from . import credentials, telemetry
 from .logging import StructuredLogger
 from .storage import ArtifactMetadata, StorageClient
@@ -20,50 +21,6 @@ except Exception:  # noqa: BLE001
     pd = None  # type: ignore
 
 
-@dataclass
-class BootstrapResult:
-    credentials: credentials.RuntimeCredentials
-    celery_ready: bool
-
-    def public_config(self) -> Dict[str, str]:
-        return self.credentials.public_config()
-
-
-@dataclass
-class DatasetResult:
-    rows: list[dict[str, Any]]
-    frame: "pd.DataFrame | None"
-    source: str
-    loaded_at: _dt.datetime
-    earliest_issue_date: _dt.date
-    latest_issue_date: _dt.date
-
-    @property
-    def row_count(self) -> int:
-        return len(self.rows)
-
-    @property
-    def max_window_days(self) -> int:
-        return (self.latest_issue_date - self.earliest_issue_date).days + 1
-
-
-@dataclass
-class FilterResult:
-    window_days: int
-    rows: list[dict[str, Any]]
-    frame: "pd.DataFrame | None"
-    row_count: int
-    duration_ms: int
-    cache_hit: bool = False
-
-
-@dataclass
-class InlineFeedback:
-    conversation_id: str
-    comments: str
-    submitted_at: _dt.datetime = field(default_factory=lambda: _dt.datetime.now(_dt.timezone.utc))
-
-
 class SessionTasks:
     """Bundle of asynchronous tasks used by the app controller."""
 
@@ -72,12 +29,12 @@ class SessionTasks:
         self._storage = storage_client
 
     # ------------------------------------------------------------------ bootstrap
-    async def bootstrap(self) -> BootstrapResult:
+    async def bootstrap(self) -> dataset_models.BootstrapResult:
         with telemetry.telemetry_span(self._logger, "bootstrap"):
             creds = credentials.load_runtime_credentials()
             celery_ready = await self._ensure_celery_ready(creds)
             self._logger.info("bootstrap.complete", celery_ready=celery_ready)
-            return BootstrapResult(credentials=creds, celery_ready=celery_ready)
+            return dataset_models.BootstrapResult(credentials=creds, celery_ready=celery_ready)
 
     async def _ensure_celery_ready(self, creds: credentials.RuntimeCredentials) -> bool:
         broker = creds.celery_broker_url
@@ -89,7 +46,7 @@ class SessionTasks:
         return True
 
     # ------------------------------------------------------------------ dataset loading
-    async def load_dataset(self, creds: credentials.RuntimeCredentials) -> DatasetResult:
+    async def load_dataset(self, creds: credentials.RuntimeCredentials) -> dataset_models.DatasetResult:
         with telemetry.telemetry_span(self._logger, "dataset.load"):
             if optional_dependencies.is_pandas_available() and creds.dataset_key:
                 dataset = await self._load_remote_dataset(creds)
@@ -98,7 +55,9 @@ class SessionTasks:
             self._logger.warning("dataset.synthetic", reason="using synthetic fallback")
             return self._generate_synthetic_dataset()
 
-    async def _load_remote_dataset(self, creds: credentials.RuntimeCredentials) -> DatasetResult | None:
+    async def _load_remote_dataset(
+        self, creds: credentials.RuntimeCredentials
+    ) -> dataset_models.DatasetResult | None:
         parquet_bytes = self._storage.read_parquet(creds.dataset_key or "")
         if not parquet_bytes:
             return None
@@ -110,7 +69,7 @@ class SessionTasks:
         rows = frame.to_dict("records")
         earliest = frame["issue_date"].min().date()
         latest = frame["issue_date"].max().date()
-        return DatasetResult(
+        return dataset_models.DatasetResult(
             rows=rows,
             frame=frame,
             source="s3",
@@ -119,7 +78,7 @@ class SessionTasks:
             latest_issue_date=latest,
         )
 
-    def _generate_synthetic_dataset(self, count: int = 60) -> DatasetResult:
+    def _generate_synthetic_dataset(self, count: int = 60) -> dataset_models.DatasetResult:
         today = _dt.date.today()
         records = []
         for idx in range(count):
@@ -142,7 +101,7 @@ class SessionTasks:
             frame = None
         earliest = records[0]["issue_date"]
         latest = records[-1]["issue_date"]
-        return DatasetResult(
+        return dataset_models.DatasetResult(
             rows=records,
             frame=frame,
             source="synthetic",
@@ -152,7 +111,9 @@ class SessionTasks:
         )
 
     # ------------------------------------------------------------------ filtering
-    async def filter_dataset(self, dataset: DatasetResult, window_days: int) -> FilterResult:
+    async def filter_dataset(
+        self, dataset: dataset_models.DatasetResult, window_days: int
+    ) -> dataset_models.FilterResult:
         with telemetry.telemetry_span(self._logger, "dataset.filter", window_days=window_days):
             start = _dt.datetime.now(_dt.timezone.utc)
             rows = self._filter_rows(dataset.rows, dataset.latest_issue_date, window_days)
@@ -162,7 +123,7 @@ class SessionTasks:
                 cutoff = dataset.latest_issue_date - _dt.timedelta(days=window_days - 1)
                 mask = dataset.frame["issue_date"] >= _dt.datetime.combine(cutoff, _dt.time.min)
                 frame = dataset.frame.loc[mask]
-            return FilterResult(
+            return dataset_models.FilterResult(
                 window_days=window_days,
                 rows=rows,
                 frame=frame,
@@ -182,7 +143,7 @@ class SessionTasks:
         return filtered
 
     # ------------------------------------------------------------------ feedback
-    async def submit_inline_feedback(self, payload: InlineFeedback) -> None:
+    async def submit_inline_feedback(self, payload: dataset_models.InlineFeedback) -> None:
         with telemetry.telemetry_span(self._logger, "feedback.inline"):
             self._logger.info(
                 "feedback.inline.submitted",

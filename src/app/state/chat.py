@@ -1,4 +1,4 @@
-# Reactive chat controller orchestrating backend, attestation, and feedback flows.
+"""Reactive chat controller orchestrating backend, attestation, and feedback flows."""
 
 from __future__ import annotations
 
@@ -9,7 +9,9 @@ from typing import Callable, Dict, List, Optional
 
 import solara
 
-from . import attestation, backend, models
+from app.models import chat as chat_models
+from app.services import attestation as attestation_service
+from app.services import chat_backend
 
 
 class ChatController:
@@ -17,30 +19,32 @@ class ChatController:
 
     def __init__(
         self,
-        backend_client: backend.ChatBackend,
-        attestation_store: attestation.AttestationStore,
+        *,
+        backend_client: chat_backend.ChatBackend,
+        attestation_store: attestation_service.AttestationStore,
         prompt_categories: Optional[Dict[str, List[str]]] = None,
-    ):
+    ) -> None:
         self._backend = backend_client
         self._attestation_store = attestation_store
         attested = attestation_store.read()
-        attestation_state = models.AttestationState(
+        attestation_state = chat_models.AttestationState(
             required=attested is None or attested is False,
             accepted=bool(attested),
             last_accepted_at=None,
         )
         if attestation_state.accepted:
             attestation_state.required = False
-        initial_state = models.ChatState(
+        initial_state = chat_models.ChatState(
             attestation=attestation_state,
             prompt_categories=prompt_categories or {},
         )
-        self.state: solara.Reactive[models.ChatState] = solara.reactive(initial_state)
+        self.state: solara.Reactive[chat_models.ChatState] = solara.reactive(initial_state)
 
     # ------------------------------------------------------------------ Attestation
     def record_attestation(self, accepted: bool) -> None:
         now = _dt.datetime.now(_dt.timezone.utc)
-        def updater(prev: models.ChatState):
+
+        def updater(prev: chat_models.ChatState):
             att = dataclasses.replace(
                 prev.attestation,
                 required=not accepted,
@@ -57,22 +61,24 @@ class ChatController:
         text = text.strip()
         if not text:
             return
-        user_message = models.Message(
-            id=models.new_message_id(),
+        user_message = chat_models.Message(
+            id=chat_models.new_message_id(),
             role="user",
             blocks=[
-                models.MessageBlock.single(
-                    models.MessagePart(kind="text", text=text),
+                chat_models.MessageBlock.single(
+                    chat_models.MessagePart(kind="text", text=text),
                 )
             ],
             status="complete",
         )
-        assistant_id = models.new_message_id()
-        placeholder = models.Message(
+        assistant_id = chat_models.new_message_id()
+        placeholder = chat_models.Message(
             id=assistant_id,
             role="assistant",
             blocks=[
-                models.MessageBlock.single(models.MessagePart(kind="text", text="Thinking…")),
+                chat_models.MessageBlock.single(
+                    chat_models.MessagePart(kind="text", text="Thinking…"),
+                )
             ],
             status="thinking",
             toolbar_collapsed=True,
@@ -80,7 +86,7 @@ class ChatController:
 
         history_for_backend = [*self.state.value.messages, user_message]
 
-        def enqueue(prev: models.ChatState):
+        def enqueue(prev: chat_models.ChatState):
             messages = [*prev.messages, user_message, placeholder]
             pending = [*prev.pending_message_ids, assistant_id]
             return {"messages": messages, "pending_message_ids": pending}
@@ -98,19 +104,30 @@ class ChatController:
 
         return loop.create_task(self._resolve_assistant(assistant_id, history_for_backend))
 
-    async def _resolve_assistant(self, assistant_id: str, history_for_backend: list[models.Message]) -> None:
+    async def _resolve_assistant(
+        self, assistant_id: str, history_for_backend: list[chat_models.Message]
+    ) -> None:
         try:
             assistant_message = await self._backend.respond(history_for_backend)
             final_message = dataclasses.replace(assistant_message, id=assistant_id, status="complete")
         except Exception as error:  # noqa: BLE001
-            final_message = models.Message(
+            final_message = chat_models.Message(
                 id=assistant_id,
                 role="assistant",
                 status="complete",
-                blocks=[models.MessageBlock.from_parts([models.MessagePart(kind="text", text="Sorry, something went wrong."), models.MessagePart(kind="text", text=str(error))])],
+                blocks=[
+                    chat_models.MessageBlock.from_parts(
+                        [
+                            chat_models.MessagePart(
+                                kind="text", text="Sorry, something went wrong."
+                            ),
+                            chat_models.MessagePart(kind="text", text=str(error)),
+                        ]
+                    )
+                ],
             )
 
-        def resolve(prev: models.ChatState):
+        def resolve(prev: chat_models.ChatState):
             messages = list(prev.messages)
             idx = prev.message_index(assistant_id)
             if idx is not None:
@@ -122,7 +139,7 @@ class ChatController:
 
     # ------------------------------------------------------------------ Toolbar + feedback helpers
     def toggle_code_panel(self, message_id: str) -> None:
-        def updater(prev: models.ChatState):
+        def updater(prev: chat_models.ChatState):
             idx = prev.message_index(message_id)
             if idx is None:
                 return {}
@@ -134,17 +151,21 @@ class ChatController:
         self.state.update(updater)
 
     def toggle_feedback_panel(self, message_id: str) -> None:
-        def updater(prev: models.ChatState):
+        def updater(prev: chat_models.ChatState):
             current = prev.active_feedback_message_id
             new_active = None if current == message_id else message_id
             return {"active_feedback_message_id": new_active}
 
         self.state.update(updater)
 
-    def update_feedback_draft(self, message_id: str, mutator: Callable[[models.FeedbackDraft], models.FeedbackDraft]) -> None:
-        def updater(prev: models.ChatState):
+    def update_feedback_draft(
+        self,
+        message_id: str,
+        mutator: Callable[[chat_models.FeedbackDraft], chat_models.FeedbackDraft],
+    ) -> None:
+        def updater(prev: chat_models.ChatState):
             drafts = dict(prev.feedback_drafts)
-            draft = drafts.get(message_id, models.FeedbackDraft())
+            draft = drafts.get(message_id, chat_models.FeedbackDraft())
             drafts[message_id] = mutator(draft)
             return {"feedback_drafts": drafts}
 
@@ -154,13 +175,13 @@ class ChatController:
         draft = self.state.value.feedback_drafts.get(message_id)
         if draft is None:
             return
-        record = models.FeedbackRecord(
+        record = chat_models.FeedbackRecord(
             minutes_saved=draft.minutes_saved,
             score=draft.score,
             comments=draft.comments,
         )
 
-        def updater(prev: models.ChatState):
+        def updater(prev: chat_models.ChatState):
             submissions = dict(prev.feedback_submissions)
             submissions[message_id] = record
             drafts = dict(prev.feedback_drafts)
@@ -176,3 +197,4 @@ class ChatController:
             return payload
 
         self.state.update(updater)
+

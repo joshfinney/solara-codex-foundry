@@ -8,9 +8,10 @@ from typing import Iterable
 import solara
 
 
+_BASE = Path(__file__).resolve().parent.parent
 CSS_ASSETS = [
-    Path(__file__).resolve().parent.parent / "styles" / "sidebar.css",
-    Path(__file__).resolve().parent.parent / "styles" / "chat.css",
+    _BASE / "ui" / "styles" / "sidebar.css",
+    _BASE / "ui" / "styles" / "chat.css",
 ]
 
 

@@ -1,9 +1,14 @@
-from solara_codex_foundry.chat import attestation, backend, models, state
+from app.models import chat as models
+from app.services import attestation, chat_backend
+from app.state import ChatController
 
 
 def make_controller(initial_attested: bool | None = True):
     store = attestation.MemoryAttestationStore(initial=initial_attested)
-    controller = state.ChatController(backend.MockChatBackend(delay_seconds=0.0), store)
+    controller = ChatController(
+        backend_client=chat_backend.MockChatBackend(delay_seconds=0.0),
+        attestation_store=store,
+    )
     return controller, store
 
 

@@ -8,13 +8,12 @@ from pathlib import Path
 
 import solara
 
-from solara_codex_foundry.chat import attestation, backend, state as chat_state
-
-from ..components import feedback, grid, header, panels, sidebar
-from ..core import gates, styles
-from ..core.state import AppController
-from ..services.logging import StructuredLogger
-from ..services.storage import StorageClient
+from app.services import attestation, chat_backend
+from app.state import AppController, ChatController
+from app.services.logging import StructuredLogger
+from app.services.storage import StorageClient
+from app.core import gates, styles
+from app.ui.components import feedback, grid, header, panels, sidebar
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 ATTESTATION_FILE = PROJECT_ROOT / "storage" / "attestation_state.json"
@@ -32,13 +31,17 @@ def load_prompt_suggestions() -> dict[str, list[str]]:
 
 def create_controller() -> AppController:
     logger = StructuredLogger()
-    chat_controller = chat_state.ChatController(
-        backend_client=backend.MockChatBackend(),
+    chat_controller = ChatController(
+        backend_client=chat_backend.MockChatBackend(),
         attestation_store=attestation.FileAttestationStore(ATTESTATION_FILE),
         prompt_categories=load_prompt_suggestions(),
     )
     storage_client = StorageClient(logger, bucket=os.getenv("PRIMARY_CREDIT_S3_BUCKET"))
-    return AppController(chat_controller=chat_controller, logger=logger, storage_client=storage_client)
+    return AppController(
+        chat_controller=chat_controller,
+        logger=logger,
+        storage_client=storage_client,
+    )
 
 
 @solara.component

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import datetime as _dt
+import random
 from typing import Callable, Dict, List, Optional
 
 import solara
@@ -34,9 +35,18 @@ class ChatController:
         )
         if attestation_state.accepted:
             attestation_state.required = False
+        curated_prompts: Dict[str, List[str]] = {}
+        if prompt_categories:
+            rng = random.Random()
+            for category, prompts in prompt_categories.items():
+                if not prompts:
+                    continue
+                sample_size = min(2, len(prompts))
+                curated_prompts[category] = rng.sample(prompts, sample_size)
+
         initial_state = chat_models.ChatState(
             attestation=attestation_state,
-            prompt_categories=prompt_categories or {},
+            prompt_categories=curated_prompts,
         )
         self.state: solara.Reactive[chat_models.ChatState] = solara.reactive(initial_state)
 

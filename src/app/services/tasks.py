@@ -7,18 +7,12 @@ import datetime as _dt
 import io
 import random
 from typing import Any, Iterable
-
-from app.core import optional_dependencies
 from app.models import dataset as dataset_models
+from app.core.pandas_compat import pd
 
 from . import credentials, telemetry
 from .logging import StructuredLogger
 from .storage import ArtifactMetadata, StorageClient
-
-try:  # pragma: no cover - best effort optional import
-    import pandas as pd
-except Exception:  # noqa: BLE001
-    pd = None  # type: ignore
 
 
 class SessionTasks:
@@ -48,7 +42,7 @@ class SessionTasks:
     # ------------------------------------------------------------------ dataset loading
     async def load_dataset(self, creds: credentials.RuntimeCredentials) -> dataset_models.DatasetResult:
         with telemetry.telemetry_span(self._logger, "dataset.load"):
-            if optional_dependencies.is_pandas_available() and creds.dataset_key:
+            if creds.dataset_key:
                 dataset = await self._load_remote_dataset(creds)
                 if dataset:
                     return dataset
@@ -60,8 +54,6 @@ class SessionTasks:
     ) -> dataset_models.DatasetResult | None:
         parquet_bytes = self._storage.read_parquet(creds.dataset_key or "")
         if not parquet_bytes:
-            return None
-        if not optional_dependencies.is_pandas_available() or pd is None:
             return None
         with telemetry.telemetry_span(self._logger, "dataset.read_parquet", source="s3"):
             buffer = io.BytesIO(parquet_bytes)
@@ -94,11 +86,8 @@ class SessionTasks:
                     "bookrunner": random.choice(["Solara Markets", "Northwind Securities", "Plaza Brokerage"]),
                 }
             )
-        if optional_dependencies.is_pandas_available() and pd is not None:
-            frame = pd.DataFrame(records)
-            frame["issue_date"] = pd.to_datetime(frame["issue_date"])
-        else:
-            frame = None
+        frame = pd.DataFrame(records)
+        frame["issue_date"] = pd.to_datetime(frame["issue_date"])
         earliest = records[0]["issue_date"]
         latest = records[-1]["issue_date"]
         return dataset_models.DatasetResult(
@@ -119,7 +108,7 @@ class SessionTasks:
             rows = self._filter_rows(dataset.rows, dataset.latest_issue_date, window_days)
             duration_ms = int((_dt.datetime.now(_dt.timezone.utc) - start).total_seconds() * 1000)
             frame = None
-            if dataset.frame is not None and optional_dependencies.is_pandas_available():
+            if dataset.frame is not None:
                 cutoff = dataset.latest_issue_date - _dt.timedelta(days=window_days - 1)
                 mask = dataset.frame["issue_date"] >= _dt.datetime.combine(cutoff, _dt.time.min)
                 frame = dataset.frame.loc[mask]

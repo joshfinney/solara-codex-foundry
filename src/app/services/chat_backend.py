@@ -6,7 +6,7 @@ import asyncio
 import random
 from typing import Protocol, Sequence
 
-from . import models
+from app.models import chat as models
 
 
 class ChatBackend(Protocol):

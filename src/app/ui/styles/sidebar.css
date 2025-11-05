@@ -3,6 +3,19 @@
   width: 100%;
   min-height: 100vh;
   background: #f4f6fb;
+  display: flex;
+  flex-direction: column;
+}
+
+.pc-main {
+  position: relative;
+  width: 100%;
+  transition: margin-right 240ms ease-in-out;
+  min-height: 100vh;
+}
+
+.pc-shell.sidebar-open .pc-main {
+  margin-right: min(420px, 90vw);
 }
 
 .pc-sidebar {

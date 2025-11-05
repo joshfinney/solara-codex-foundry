@@ -1,0 +1,126 @@
+.pc-header {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 0.75rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 15;
+}
+
+.pc-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.pc-title {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pc-meta {
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.pc-env {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pc-badge {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.pc-header-tab {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  color: rgba(15, 23, 42, 0.6);
+  font-weight: 500;
+  transition: all 160ms ease-in-out;
+}
+
+.pc-header-tab.active {
+  background: rgba(37, 99, 235, 0.14);
+  color: #1d4ed8;
+}
+
+.pc-ai-button {
+  font-weight: 600;
+}
+
+.pc-toolbar {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  margin: 1rem 1.5rem;
+  gap: 1rem;
+}
+
+.pc-toolbar-heading {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pc-toolbar-subheading {
+  font-size: 0.8rem;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.pc-toolbar-slider {
+  min-width: 220px;
+}
+
+.pc-feedback-input {
+  min-width: 220px;
+}
+
+.pc-feedback-success {
+  font-size: 0.8rem;
+  color: #16a34a;
+}
+
+.pc-grid-container {
+  width: 100%;
+  min-height: 420px;
+  padding: 0 1.5rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.pc-footer {
+  padding: 0.75rem 1.5rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+}
+
+.pc-status-pill {
+  background: rgba(15, 23, 42, 0.05);
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+}
+
+.pc-status-label {
+  font-size: 0.75rem;
+  color: rgba(15, 23, 42, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pc-status-value {
+  font-size: 0.85rem;
+  color: #0f172a;
+  font-weight: 600;
+}

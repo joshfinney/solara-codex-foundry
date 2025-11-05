@@ -7,7 +7,6 @@ import io
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from ..core import optional_dependencies
 from .logging import StructuredLogger
 
 
@@ -27,14 +26,14 @@ class StorageClient:
         self._bucket = bucket
         self._prefix = prefix.strip("/") + "/" if prefix else ""
         self._s3 = None
-        if bucket and optional_dependencies.is_boto3_available():  # pragma: no branch - simple guard
-            import boto3  # type: ignore
-
-            self._s3 = boto3.client("s3")
-            self._logger.info("storage.s3.initialized", bucket=bucket)
-        else:
-            if bucket:
-                self._logger.warning("storage.s3.unavailable", reason="boto3 not installed")
+        if bucket:
+            try:
+                import boto3  # type: ignore
+            except Exception as error:  # noqa: BLE001
+                self._logger.warning("storage.s3.unavailable", reason=str(error))
+            else:
+                self._s3 = boto3.client("s3")
+                self._logger.info("storage.s3.initialized", bucket=bucket)
 
     # ------------------------------------------------------------------ parquet loading
     def read_parquet(self, key: str) -> bytes | None:
@@ -74,7 +73,7 @@ class StorageClient:
                 )
                 object_key = None
         else:
-            self._logger.info("storage.s3.upload_skipped", reason="bucket or boto3 missing")
+            self._logger.info("storage.s3.upload_skipped", reason="bucket missing or client unavailable")
         return ArtifactMetadata(name=name, content_type=content_type, size=size, object_key=object_key)
 
     # ------------------------------------------------------------------ helpers

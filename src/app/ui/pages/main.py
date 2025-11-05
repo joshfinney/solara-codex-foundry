@@ -1,23 +1,40 @@
-"""Primary Credit application workspace."""
+"""Application routing and workspace composition."""
 
 from __future__ import annotations
 
 import json
 import os
 from pathlib import Path
+from typing import Callable, Dict
 
 import solara
 
+from app.core import styles
 from app.services import attestation, chat_backend
-from app.state import AppController, ChatController
 from app.services.logging import StructuredLogger
 from app.services.storage import StorageClient
-from app.core import gates, styles
-from app.ui.components import feedback, grid, header, panels, sidebar
+from app.state import AppController, ChatController
+from app.ui.components import feedback, header, sidebar, workspace
+from app.ui.components.auth import AuthorizationWrapper
+from app.ui.pages import ai, allocations, new_issue
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 ATTESTATION_FILE = PROJECT_ROOT / "storage" / "attestation_state.json"
 PROMPT_SUGGESTIONS_FILE = PROJECT_ROOT / "storage" / "prompt_suggestions.json"
+
+HOME_PATH = "/"
+ROUTE_COMPONENTS: Dict[str, Callable[[AppController], None]] = {
+    "/": new_issue.View,
+    "/allocations": allocations.View,
+    "/ai": ai.View,
+}
+ROUTE_TABS = {
+    "/": "new_issues",
+    "/allocations": "allocations",
+    "/ai": "ai",
+}
+
+_controller_singleton: AppController | None = None
 
 
 def load_prompt_suggestions() -> dict[str, list[str]]:
@@ -44,62 +61,87 @@ def create_controller() -> AppController:
     )
 
 
-@solara.component
-def Page():
-    styles.use_global_styles()
-    controller = solara.use_memo(create_controller, [])
-    app_state = controller.state.use()
-
-    if not app_state.gate.is_authenticated:
-        gates.LoginGate(controller.authenticate)
-        return
-    if not app_state.gate.has_accepted_terms:
-        gates.TermsGate(app_state.gate.attestation_message, controller.accept_terms)
-        return
-
-    sidebar.SidebarLayout(controller, body=lambda: _MainWorkspace(controller))
-    feedback.FeedbackModal(controller)
+def _get_controller() -> AppController:
+    global _controller_singleton
+    if _controller_singleton is None:
+        _controller_singleton = create_controller()
+    return _controller_singleton
 
 
 @solara.component
-def _MainWorkspace(controller: AppController):
-    app_state = controller.state.use()
+def _WorkspaceShell(
+    controller: AppController,
+    *,
+    current_path: str,
+    render_content: Callable[[], None],
+) -> None:
+    session_state = controller.state.use(lambda s: s.session)
+    ui_state = controller.state.use(lambda s: s.ui)
+    expected_tab = ROUTE_TABS.get(current_path, "new_issues")
+
+    def sync_tab():
+        if ui_state.active_tab != expected_tab:
+            controller.set_active_tab(expected_tab)
+
+    solara.use_effect(sync_tab, [expected_tab, ui_state.active_tab])
+
     with solara.Column(
         classes=["pc-workspace"],
         style={
-            "maxWidth": "1400px",
+            "maxWidth": "1440px",
             "margin": "0 auto",
-            "padding": "1.5rem",
             "gap": "1rem",
-            "boxSizing": "border-box",
+            "paddingTop": "1rem",
         },
     ):
-        header.AppHeader(controller)
-        if app_state.session.bootstrapping and not app_state.session.ready:
+        header.AppHeader(controller, current_path)
+        workspace.WorkspaceToolbar(controller)
+        if session_state.bootstrapping and not session_state.ready:
             solara.ProgressLinear(indeterminate=True)
-            solara.Text(app_state.session.loading_label, classes=["caption"])
-            return
+            solara.Text(session_state.loading_label, classes=["caption"])
+        else:
+            render_content()
+        workspace.AppFooter(controller)
 
-        with solara.Row(justify="start", style={"gap": "0.5rem"}):
-            for tab, label in [("new_issues", "New Issues"), ("allocations", "Allocations")]:
-                solara.Button(
-                    label,
-                    color="primary" if app_state.ui.active_tab == tab else None,
-                    outlined=app_state.ui.active_tab != tab,
-                    on_click=lambda value=tab: controller.set_active_tab(value),
-                )
 
-        if app_state.ui.active_tab == "allocations":
-            with solara.Card(title="Allocations", style={"minHeight": "300px"}):
-                solara.Markdown(
-                    "This view is under construction. Allocation analytics will appear here soon.",
-                )
-            return
+def _make_route(path: str, name: str) -> solara.Route:
+    view = ROUTE_COMPONENTS.get(path, ROUTE_COMPONENTS[HOME_PATH])
 
-        with solara.Column(style={"gap": "1rem"}):
-            with solara.Row(justify="between", style={"gap": "1rem", "alignItems": "stretch", "flexWrap": "wrap"}):
-                with solara.Column(style={"flex": "2 1 360px", "gap": "1rem"}):
-                    panels.LookbackPanel(controller)
-                with solara.Column(style={"flex": "1 1 320px", "gap": "1rem"}):
-                    panels.InlineFeedbackPanel(controller)
-            grid.IssueGrid(controller)
+    @solara.component
+    def _route():
+        controller = solara.use_memo(_get_controller, [])
+        styles.use_global_styles()
+        router = solara.use_router()
+        current_path = router.path if router else path
+
+        def body():
+            view(controller)
+
+        sidebar.SidebarLayout(
+            controller,
+            body=lambda: _WorkspaceShell(controller, current_path=current_path, render_content=body),
+        )
+        feedback.FeedbackModal(controller)
+
+    return solara.Route(path=path, component=_route, name=name)
+
+
+routes = [
+    _make_route(HOME_PATH, "new-issue"),
+    _make_route("/allocations", "allocations"),
+    _make_route("/ai", "ai"),
+]
+
+
+@solara.component
+def _AuthorizedRouter() -> None:
+    solara.Router(routes=routes)
+
+
+@solara.component
+def Page():
+    AuthorizationWrapper(
+        component=_AuthorizedRouter,
+        app_name="Primary Credit",
+        display_name="Primary Credit Issuance Workspace",
+    )

@@ -12,6 +12,7 @@ _BASE = Path(__file__).resolve().parent.parent
 CSS_ASSETS = [
     _BASE / "ui" / "styles" / "sidebar.css",
     _BASE / "ui" / "styles" / "chat.css",
+    _BASE / "ui" / "styles" / "layout.css",
 ]
 
 

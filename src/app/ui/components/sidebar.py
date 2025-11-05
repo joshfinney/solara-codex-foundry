@@ -34,6 +34,11 @@ def ChatSidebar(controller: AppController):
 @solara.component
 def SidebarLayout(controller: AppController, body: Callable[[], None]):
     styles.use_global_styles()
-    with solara.Div(classes=["pc-shell"]):
-        body()
+    app_state = controller.state.use()
+    shell_classes = ["pc-shell"]
+    if app_state.ui.sidebar_open:
+        shell_classes.append("sidebar-open")
+    with solara.Div(classes=shell_classes):
+        with solara.Div(classes=["pc-main"]):
+            body()
         ChatSidebar(controller)

@@ -6,6 +6,24 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 
+@dataclass
+class Route:
+    path: str
+    component: Callable[..., Any]
+    name: Optional[str] = None
+
+
+class _RouterState:
+    def __init__(self):
+        self.path = "/"
+
+    def push(self, path: str) -> None:
+        self.path = path
+
+
+_router_state = _RouterState()
+
+
 class _Reactive:
     def __init__(self, value: Any):
         self.value = value
@@ -92,6 +110,20 @@ def Column(*args, **kwargs):
         args[0]()
 
 
+def Div(*args, **kwargs):
+    if len(args) == 1 and callable(args[0]):
+        args[0]()
+
+
+def Link(*, href: str, children: Optional[Callable[[], None]] = None, **_kwargs):
+    if children:
+        children()
+
+
+def Image(*args, **kwargs):
+    pass
+
+
 def Success(*args, **kwargs):
     pass
 
@@ -118,6 +150,26 @@ def Switch(*args, **kwargs):
 
 def Slider(*args, **kwargs):
     pass
+
+
+def use_router():
+    return _router_state
+
+
+def Router(*, routes: Iterable[Route]):
+    routes = list(routes)
+    target = None
+    for route in routes:
+        if route.path == _router_state.path:
+            target = route
+            break
+    if target is None and routes:
+        target = routes[0]
+    if target is None:
+        return
+    component = target.component
+    if callable(component):
+        component()
 
 
 class _VNamespace:

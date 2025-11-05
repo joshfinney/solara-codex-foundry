@@ -13,9 +13,11 @@ from app.models import dataset as dataset_models
 class GateState:
     """Minimal state required for the login/attestation flow."""
 
-    is_authenticated: bool = False
-    has_accepted_terms: bool = False
+    is_authenticated: bool = True
+    has_accepted_terms: bool = True
     username: Optional[str] = None
+    first_name: Optional[str] = None
+    display_name: Optional[str] = None
     attestation_message: str = (
         "I confirm that I will validate AI output before using it for credit decisions."
     )
@@ -46,11 +48,12 @@ class DatasetState:
 
 @dataclass(slots=True)
 class UIState:
-    sidebar_open: bool = False
+    sidebar_open: bool = True
     active_tab: str = "new_issues"
     inline_feedback_text: str = ""
     inline_feedback_status: str = "idle"
     conversation_id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
+    inline_feedback_open: bool = False
 
 
 @dataclass(slots=True)

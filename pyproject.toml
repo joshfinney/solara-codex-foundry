@@ -12,6 +12,9 @@ dependencies = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "httpx>=0.28.1",
+    "pandas>=2.0.0",
+    "ipyaggrid>=0.4.0",
+    "boto3>=1.34.0",
     "ruff>=0.14.3",
     "mypy>=1.18.2",
 ]

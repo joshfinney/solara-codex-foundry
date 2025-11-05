@@ -7,6 +7,7 @@ from typing import Callable, Dict, Iterable, List, Optional
 
 import solara
 from solara.lab.components.chat import ChatMessage as LabChatMessage
+from solara.labs import headers as header_utils
 
 from app.models import chat as chat_models
 from app.state import ChatController
@@ -167,7 +168,9 @@ def MessageAssistantExtras(msg: chat_models.Message, controller: ChatController)
 def MessageView(msg: chat_models.Message, controller: ChatController):
     """Render a chat message with toolbar and optional code panel."""
 
-    role_label = "You" if msg.role == "user" else "Assistant"
+    user_profile = header_utils.use_user()
+    user_display = user_profile.first_name or user_profile.display_name or user_profile.uid
+    role_label = user_display if msg.role == "user" else "Assistant"
     bubble_color = "rgba(33, 150, 243, 0.18)" if msg.role == "user" else "rgba(0,0,0,0)"
 
     with solara.Column(classes=["chat-message-wrapper"], style={"width": "100%", "gap": "0.25rem"}):

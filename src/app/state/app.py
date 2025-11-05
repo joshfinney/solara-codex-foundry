@@ -68,6 +68,25 @@ class AppController:
         self.state.update(updater)
         self.chat.record_attestation(True)
 
+    def set_user_profile(
+        self,
+        *,
+        uid: str | None = None,
+        first_name: str | None = None,
+        display_name: str | None = None,
+    ) -> None:
+        def updater(prev: app_models.AppState):
+            gate = dataclasses.replace(
+                prev.gate,
+                username=uid or prev.gate.username,
+                first_name=first_name or prev.gate.first_name,
+                display_name=display_name or prev.gate.display_name,
+                is_authenticated=True,
+            )
+            return {"gate": gate}
+
+        self.state.update(updater)
+
     # ------------------------------------------------------------------ bootstrap + dataset loading
     async def _bootstrap(self) -> None:
         if self._bootstrap_inflight:
@@ -231,7 +250,41 @@ class AppController:
         self._spawn(self._apply_filter(window_days))
 
     def update_inline_feedback_text(self, text: str) -> None:
-        self.state.update(lambda prev: {"ui": dataclasses.replace(prev.ui, inline_feedback_text=text)})
+        def updater(prev: app_models.AppState):
+            ui = dataclasses.replace(prev.ui, inline_feedback_text=text, inline_feedback_open=True)
+            return {"ui": ui}
+
+        self.state.update(updater)
+
+    def set_inline_feedback_open(self, open_: bool) -> None:
+        def updater(prev: app_models.AppState):
+            ui = prev.ui
+            text = ui.inline_feedback_text if open_ else ""
+            status = ui.inline_feedback_status
+            if not open_ and status == "submitted":
+                status = "idle"
+            return {
+                "ui": dataclasses.replace(
+                    ui,
+                    inline_feedback_open=open_,
+                    inline_feedback_text=text,
+                    inline_feedback_status=status,
+                )
+            }
+
+        self.state.update(updater)
+
+    def cancel_inline_feedback(self) -> None:
+        def updater(prev: app_models.AppState):
+            ui = dataclasses.replace(
+                prev.ui,
+                inline_feedback_open=False,
+                inline_feedback_text="",
+                inline_feedback_status="idle",
+            )
+            return {"ui": ui}
+
+        self.state.update(updater)
 
     def submit_inline_feedback(self) -> None:
         comments = self.state.value.ui.inline_feedback_text.strip()
@@ -257,6 +310,7 @@ class AppController:
                         inline_feedback_text="",
                         inline_feedback_status="submitted",
                         conversation_id=uuid.uuid4().hex[:8],
+                        inline_feedback_open=False,
                     )
                 }
 

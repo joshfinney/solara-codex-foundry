@@ -1,30 +1,41 @@
-"""Issuance grid with optional Ag-Grid support."""
+"""Issuance grid rendered with ipyaggrid and rich defaults."""
 
 from __future__ import annotations
 
-import html
 from typing import Iterable
 
 import solara
+from ipyaggrid import Grid
 
-from app.core import optional_dependencies
+from app.core.pandas_compat import pd
+
 from app.state import AppController
 
 
-def _render_table(rows: Iterable[dict]) -> str:
-    headers = []
-    for row in rows:
-        for key in row.keys():
-            if key not in headers:
-                headers.append(key)
-    header_html = "".join(f"<th>{html.escape(str(col))}</th>" for col in headers)
-    body_html = ""
-    for row in rows:
-        body_html += "<tr>"
-        for col in headers:
-            body_html += f"<td>{html.escape(str(row.get(col, '')))}</td>"
-        body_html += "</tr>"
-    return f"<table class='pc-table'><thead><tr>{header_html}</tr></thead><tbody>{body_html}</tbody></table>"
+def _formatter_for_series(series: pd.Series) -> dict[str, object]:
+    if pd.api.types.is_datetime64_any_dtype(series.dtype):
+        return {"valueFormatter": {"function": "value ? new Date(value).toLocaleDateString() : ''"}}
+    if pd.api.types.is_numeric_dtype(series.dtype):
+        return {
+            "type": "numericColumn",
+            "valueFormatter": {"function": "value != null ? value.toLocaleString() : ''"},
+        }
+    return {}
+
+
+def _build_column_defs(frame: pd.DataFrame) -> list[dict[str, object]]:
+    column_defs: list[dict[str, object]] = []
+    for column in frame.columns:
+        base_def: dict[str, object] = {
+            "headerName": column.replace("_", " ").title(),
+            "field": column,
+            "sortable": True,
+            "filter": True,
+            "resizable": True,
+        }
+        base_def.update(_formatter_for_series(frame[column]))
+        column_defs.append(base_def)
+    return column_defs
 
 
 @solara.component
@@ -36,29 +47,57 @@ def IssueGrid(controller: AppController):
         dataset_state.raw.frame if dataset_state.raw else None
     )
 
-    prefer_aggrid = optional_dependencies.is_ipyaggrid_available() and optional_dependencies.is_pandas_available()
-    if prefer_aggrid and frame is not None:
-        try:
-            from ipyaggrid import Grid  # type: ignore
-
-            grid = Grid(grid_data=frame, quick_filter=True)
-            if hasattr(solara, "display"):
-                solara.display(grid)  # type: ignore[attr-defined]
-            else:  # pragma: no cover - widget fallback
-                renderer = getattr(grid, "_repr_html_", None)
-                if callable(renderer):
-                    solara.HTML(tag="div", unsafe_innerHTML=renderer(), classes=["pc-table-wrapper"])
-                else:
-                    raise RuntimeError("Cannot render ipyaggrid widget")
-            return
-        except Exception:  # noqa: BLE001
-            prefer_aggrid = False
-
-    if not rows:
-        solara.Info("No issuances found for the selected window.")
+    if frame is None or frame.empty:
+        if not rows:
+            solara.Info("No issuances found for the selected window.")
+        else:
+            solara.Text("Dataset preview unavailable.")
         return
 
-    table_html = _render_table(rows[:25])
-    solara.HTML(tag="div", unsafe_innerHTML=table_html, classes=["pc-table-wrapper"])
-    if len(rows) > 25:
-        solara.Text(f"Showing first 25 of {len(rows)} rows. Export to view all.", classes=["caption"])
+    column_defs = _build_column_defs(frame)
+    grid_options = {
+        "columnDefs": column_defs,
+        "defaultColDef": {
+            "sortable": True,
+            "filter": True,
+            "resizable": True,
+            "minWidth": 120,
+        },
+        "animateRows": True,
+        "sideBar": {
+            "toolPanels": [
+                {"id": "columns", "labelDefault": "Columns", "iconKey": "columns", "toolPanel": "agColumnsToolPanel"},
+                {"id": "filters", "labelDefault": "Filters", "iconKey": "filter", "toolPanel": "agFiltersToolPanel"},
+            ]
+        },
+        "statusBar": {
+            "statusPanels": [
+                {"statusPanel": "agTotalRowCountComponent", "align": "left"},
+                {"statusPanel": "agFilteredRowCountComponent"},
+                {"statusPanel": "agAggregationComponent"},
+            ]
+        },
+        "rowSelection": "multiple",
+        "suppressCellFocus": True,
+    }
+
+    grid = Grid(
+        grid_data=frame,
+        grid_options=grid_options,
+        columns_fit="size_to_fit",
+        quick_filter=True,
+        exportMode="auto",
+        theme="ag-theme-alpine",
+    )
+
+    def render_widget():
+        if hasattr(solara, "display"):
+            solara.display(grid)  # type: ignore[attr-defined]
+        else:  # pragma: no cover - widget fallback for tests
+            renderer = getattr(grid, "_repr_html_", None)
+            if callable(renderer):
+                solara.HTML(tag="div", unsafe_innerHTML=renderer(), classes=["pc-grid-container"])
+            else:
+                solara.Text("Unable to render grid widget.")
+
+    solara.Div(render_widget, classes=["pc-grid-container"])

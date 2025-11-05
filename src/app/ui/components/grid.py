@@ -66,8 +66,18 @@ def IssueGrid(controller: AppController):
         "animateRows": True,
         "sideBar": {
             "toolPanels": [
-                {"id": "columns", "labelDefault": "Columns", "iconKey": "columns", "toolPanel": "agColumnsToolPanel"},
-                {"id": "filters", "labelDefault": "Filters", "iconKey": "filter", "toolPanel": "agFiltersToolPanel"},
+                {
+                    "id": "columns",
+                    "labelDefault": "Columns",
+                    "iconKey": "columns",
+                    "toolPanel": "agColumnsToolPanel",
+                },
+                {
+                    "id": "filters",
+                    "labelDefault": "Filters",
+                    "iconKey": "filter",
+                    "toolPanel": "agFiltersToolPanel",
+                },
             ]
         },
         "statusBar": {
@@ -81,13 +91,20 @@ def IssueGrid(controller: AppController):
         "suppressCellFocus": True,
     }
 
-    grid = Grid(
-        grid_data=frame,
-        grid_options=grid_options,
-        columns_fit="size_to_fit",
-        quick_filter=True,
-        exportMode="auto",
-        theme="ag-theme-alpine",
+    # Keep the grid widget stable across UI re-renders (e.g. sidebar toggles)
+    # so ipyaggrid does not briefly unmount and remount, which causes a flash.
+    frame_identity = id(frame)
+
+    grid = solara.use_memo(
+        lambda: Grid(
+            grid_data=frame,
+            grid_options=grid_options,
+            columns_fit="size_to_fit",
+            quick_filter=True,
+            exportMode="auto",
+            theme="ag-theme-alpine",
+        ),
+        dependencies=[frame_identity],
     )
 
     def render_widget():

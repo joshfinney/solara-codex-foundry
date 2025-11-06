@@ -12,7 +12,6 @@ class BootstrapResult:
     """Result of the initial bootstrap handshake."""
 
     credentials: "RuntimeCredentials"
-    celery_ready: bool
 
     def public_config(self) -> Dict[str, str]:
         return self.credentials.public_config()

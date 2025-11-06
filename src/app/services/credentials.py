@@ -14,8 +14,6 @@ class RuntimeCredentials:
     s3_bucket: Optional[str] = None
     dataset_key: Optional[str] = None
     llm_api_key: Optional[str] = None
-    celery_broker_url: Optional[str] = None
-    celery_backend_url: Optional[str] = None
     mlflow_tracking_uri: Optional[str] = None
     mlflow_experiment: Optional[str] = None
     mlflow_api_token: Optional[str] = None
@@ -58,8 +56,6 @@ def load_runtime_credentials(prefix: str = "PRIMARY_CREDIT_") -> RuntimeCredenti
         s3_bucket=env.get(f"{prefix}S3_BUCKET"),
         dataset_key=env.get(f"{prefix}DATASET_KEY"),
         llm_api_key=env.get(f"{prefix}LLM_API_KEY"),
-        celery_broker_url=env.get(f"{prefix}CELERY_BROKER_URL"),
-        celery_backend_url=env.get(f"{prefix}CELERY_BACKEND_URL"),
         mlflow_tracking_uri=env.get(f"{prefix}MLFLOW_TRACKING_URI"),
         mlflow_experiment=env.get(f"{prefix}MLFLOW_EXPERIMENT"),
         mlflow_api_token=env.get(f"{prefix}MLFLOW_API_TOKEN"),

@@ -29,7 +29,6 @@ class SessionState:
     ready: bool = False
     error: str | None = None
     loading_label: str = "Preparing workspace…"
-    celery_ready: bool = False
     public_config: Dict[str, str] = field(default_factory=dict)
 
 

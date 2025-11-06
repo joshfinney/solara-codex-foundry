@@ -122,7 +122,6 @@ def AppFooter(controller: AppController) -> None:
 
     pills = [
         ("Workspace", "Ready" if session_state.ready else session_state.loading_label),
-        ("Celery", "Online" if session_state.celery_ready else "Offline"),
         ("Rows", f"{row_count:,}"),
         ("UID", state.gate.username or "unknown"),
     ]

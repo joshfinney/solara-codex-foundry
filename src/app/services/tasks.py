@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import datetime as _dt
 import io
 import random
@@ -26,18 +25,8 @@ class SessionTasks:
     async def bootstrap(self) -> dataset_models.BootstrapResult:
         with telemetry.telemetry_span(self._logger, "bootstrap"):
             creds = credentials.load_runtime_credentials()
-            celery_ready = await self._ensure_celery_ready(creds)
-            self._logger.info("bootstrap.complete", celery_ready=celery_ready)
-            return dataset_models.BootstrapResult(credentials=creds, celery_ready=celery_ready)
-
-    async def _ensure_celery_ready(self, creds: credentials.RuntimeCredentials) -> bool:
-        broker = creds.celery_broker_url
-        if not broker:
-            self._logger.warning("celery.disabled", reason="broker missing")
-            return False
-        await asyncio.sleep(0)  # yield control; placeholder for real ping
-        self._logger.info("celery.ready", broker=broker)
-        return True
+            self._logger.info("bootstrap.complete")
+            return dataset_models.BootstrapResult(credentials=creds)
 
     # ------------------------------------------------------------------ dataset loading
     async def load_dataset(self, creds: credentials.RuntimeCredentials) -> dataset_models.DatasetResult:

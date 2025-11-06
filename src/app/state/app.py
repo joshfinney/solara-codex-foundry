@@ -116,7 +116,6 @@ class AppController:
                 "session": dataclasses.replace(
                     prev.session,
                     bootstrapping=False,
-                    celery_ready=bootstrap.celery_ready,
                     error=None,
                     public_config=bootstrap.public_config(),
                     ready=False,

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as _dt
-import io
+import os
 import random
+from pathlib import Path
 from typing import Any, Iterable
-from app.models import dataset as dataset_models
+
 from app.core.pandas_compat import pd
+from app.models import dataset as dataset_models
 
 from . import credentials, telemetry
 from .logging import StructuredLogger
@@ -17,16 +20,47 @@ from .storage import ArtifactMetadata, StorageClient
 class SessionTasks:
     """Bundle of asynchronous tasks used by the app controller."""
 
-    def __init__(self, logger: StructuredLogger, storage_client: StorageClient) -> None:
+    def __init__(
+        self,
+        logger: StructuredLogger,
+        storage_client: StorageClient,
+        *,
+        execution_root: Path | None = None,
+    ) -> None:
         self._logger = logger
         self._storage = storage_client
+        self._execution_root = execution_root or Path(
+            os.getenv("PRIMARY_CREDIT_EXECUTION_ROOT", Path(__file__).resolve().parents[3])
+        )
 
     # ------------------------------------------------------------------ bootstrap
     async def bootstrap(self) -> dataset_models.BootstrapResult:
         with telemetry.telemetry_span(self._logger, "bootstrap"):
-            creds = credentials.load_runtime_credentials()
-            self._logger.info("bootstrap.complete")
-            return dataset_models.BootstrapResult(credentials=creds)
+            config_session = credentials.load_bootstrap_session()
+            if config_session is None:
+                config_session = credentials.bootstrap_environment(execution_root=self._execution_root)
+
+            runtime = credentials.load_runtime_credentials(config_session)
+            storage_creds = credentials.load_storage_credentials(config_session)
+            llm_creds = credentials.load_llm_credentials(config_session)
+            embedding_creds = credentials.load_embedding_credentials(config_session)
+
+            if storage_creds:
+                self._storage.configure(storage_creds)
+
+            self._logger.info(
+                "bootstrap.complete",
+                bucket=getattr(storage_creds, "bucket", None),
+                dataset_key=runtime.dataset_key,
+                environment=runtime.environment_key,
+            )
+            return dataset_models.BootstrapResult(
+                config=config_session,
+                credentials=runtime,
+                storage=storage_creds,
+                llm=llm_creds,
+                embeddings=embedding_creds,
+            )
 
     # ------------------------------------------------------------------ dataset loading
     async def load_dataset(self, creds: credentials.RuntimeCredentials) -> dataset_models.DatasetResult:
@@ -41,19 +75,34 @@ class SessionTasks:
     async def _load_remote_dataset(
         self, creds: credentials.RuntimeCredentials
     ) -> dataset_models.DatasetResult | None:
-        parquet_bytes = self._storage.read_parquet(creds.dataset_key or "")
-        if not parquet_bytes:
+        dataset_key = creds.dataset_key
+        if not dataset_key:
             return None
-        with telemetry.telemetry_span(self._logger, "dataset.read_parquet", source="s3"):
-            buffer = io.BytesIO(parquet_bytes)
-            frame = pd.read_parquet(buffer)
+        try:
+            frame, format_name = await asyncio.to_thread(self._storage.read_table, dataset_key)
+        except FileNotFoundError:
+            self._logger.error("dataset.read_missing", key=dataset_key)
+            return None
+        if frame is None:
+            return None
+        format_label = f"s3:{format_name}"
+        with telemetry.telemetry_span(self._logger, "dataset.read", source=format_label):
+            self._logger.info(
+                "dataset.read.complete",
+                key=dataset_key,
+                rows=len(frame),
+                columns=list(frame.columns),
+                format=format_name,
+            )
+        if format_name == "csv" and "issue_date" in frame.columns:
+            frame["issue_date"] = pd.to_datetime(frame["issue_date"])
         rows = frame.to_dict("records")
         earliest = frame["issue_date"].min().date()
         latest = frame["issue_date"].max().date()
         return dataset_models.DatasetResult(
             rows=rows,
             frame=frame,
-            source="s3",
+            source=format_label,
             loaded_at=_dt.datetime.now(_dt.timezone.utc),
             earliest_issue_date=earliest,
             latest_issue_date=latest,

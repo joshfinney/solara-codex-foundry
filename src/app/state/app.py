@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import uuid
+from pathlib import Path
 from typing import Optional
 
 import solara
@@ -27,12 +28,14 @@ class AppController:
         chat_controller: ChatController,
         logger: StructuredLogger,
         storage_client: StorageClient,
+        execution_root: Path | None = None,
     ) -> None:
         self.chat = chat_controller
         self.logger = logger
-        self.tasks = SessionTasks(logger, storage_client)
+        self.tasks = SessionTasks(logger, storage_client, execution_root=execution_root)
         self.state: solara.Reactive[app_models.AppState] = solara.reactive(app_models.AppState())
         self._credentials: Optional[RuntimeCredentials] = None
+        self._bootstrap_result: Optional[dataset_models.BootstrapResult] = None
         self._bootstrap_started = False
         self._bootstrap_inflight = False
         self._start_bootstrap()
@@ -110,6 +113,7 @@ class AppController:
             self._bootstrap_inflight = False
             return
 
+        self._bootstrap_result = bootstrap
         self._credentials = bootstrap.credentials
         self.state.update(
             lambda prev: {

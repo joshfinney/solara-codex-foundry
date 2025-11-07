@@ -41,6 +41,14 @@ class SessionTasks:
                 config_session = credentials.bootstrap_environment(execution_root=self._execution_root)
 
             runtime = credentials.load_runtime_credentials(config_session)
+            self._logger.configure_context(
+                project_name=runtime.app_name,
+                environment=runtime.environment_key,
+                region=runtime.region,
+                user_id=runtime.uid,
+            )
+            if runtime.logstash_endpoints:
+                self._logger.configure_logstash_endpoints(runtime.logstash_endpoints)
             storage_creds = credentials.load_storage_credentials(config_session)
             llm_creds = credentials.load_llm_credentials(config_session)
             embedding_creds = credentials.load_embedding_credentials(config_session)

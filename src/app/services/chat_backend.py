@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import random
-from typing import Protocol, Sequence
+from typing import Callable, Protocol, Sequence
 
+from app.backend import pandas_ai
 from app.models import chat as models
+from app.services.logging import StructuredLogger
+from app.services.storage import StorageClient
 
 
 class ChatBackend(Protocol):
@@ -78,3 +81,22 @@ class MockChatBackend:
             metadata=metadata,
             status="complete",
         )
+
+
+def create_pandas_ai_backend(
+    pandas_ai_factory: Callable[[], object],
+    *,
+    logger: StructuredLogger,
+    storage: StorageClient,
+    progress: pandas_ai.PipelineProgress | None = None,
+) -> ChatBackend:
+    """Build a PandasAI-backed chat service."""
+
+    parser = pandas_ai.PandasAIResponseParser(logger, storage)
+    return pandas_ai.PandasAIChatBackend(
+        pandas_ai_factory,
+        logger=logger,
+        storage=storage,
+        progress=progress,
+        response_parser=parser,
+    )

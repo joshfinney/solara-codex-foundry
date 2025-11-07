@@ -7,7 +7,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Mapping, MutableMapping
+from typing import Any, Dict, Iterable, Mapping, MutableMapping
 
 try:  # pragma: no cover - Python 3.11+
     import tomllib
@@ -35,6 +35,20 @@ def _json_or_raw(value: str) -> Any:
         return json.loads(value)
     except json.JSONDecodeError:
         return value
+
+
+def _coerce_endpoint_list(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        parsed = _json_or_raw(value)
+        if isinstance(parsed, list):
+            return tuple(str(item).strip() for item in parsed if str(item).strip())
+        parts = [segment.strip() for segment in value.split(",")]
+        return tuple(part for part in parts if part)
+    if isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
+        return tuple(str(item).strip() for item in value if str(item).strip())
+    return ()
 
 
 class QRExecConfig:
@@ -258,6 +272,7 @@ class RuntimeCredentials:
     llm_use_case: str | None = None
     llm_embeddings_api: str | None = None
     extra: Dict[str, Any] = field(default_factory=dict)
+    logstash_endpoints: tuple[str, ...] = field(default_factory=tuple)
 
     def public_config(self) -> Dict[str, Any]:
         payload = {
@@ -341,6 +356,13 @@ def load_runtime_credentials(
         "llm_embeddings_api": llm_embeddings_api or "",
     }
 
+    logstash_config = config.get("LOGSTASH_ENDPOINTS")
+    logstash_endpoints = _coerce_endpoint_list(logstash_config)
+    if not logstash_endpoints:
+        env_endpoint = environment.get("PRIMARY_CREDIT_LOG_LOGSTASH_URL")
+        if env_endpoint:
+            logstash_endpoints = _coerce_endpoint_list(env_endpoint)
+
     return RuntimeCredentials(
         app_display_name=app_display_name,
         app_name=app_name,
@@ -355,6 +377,7 @@ def load_runtime_credentials(
         llm_use_case=llm_use_case,
         llm_embeddings_api=llm_embeddings_api,
         extra=extra,
+        logstash_endpoints=logstash_endpoints,
     )
 
 

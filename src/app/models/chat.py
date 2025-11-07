@@ -55,6 +55,7 @@ class MessageMetadata:
 
     python_code: Optional[str] = None
     source: Optional[str] = None
+    logs: Optional[str] = None
 
 
 @dataclass(slots=True)

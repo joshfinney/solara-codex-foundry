@@ -38,6 +38,7 @@ class AppController:
         self._bootstrap_result: Optional[dataset_models.BootstrapResult] = None
         self._bootstrap_started = False
         self._bootstrap_inflight = False
+        self.logger.set_page_type("new_issue")
         self._start_bootstrap()
 
     # ------------------------------------------------------------------ lifecycle helpers
@@ -89,6 +90,7 @@ class AppController:
             return {"gate": gate}
 
         self.state.update(updater)
+        self.logger.set_user_id(uid or self.state.value.gate.username)
 
     # ------------------------------------------------------------------ bootstrap + dataset loading
     async def _bootstrap(self) -> None:
@@ -240,6 +242,7 @@ class AppController:
     # ------------------------------------------------------------------ UI interactions
     def set_active_tab(self, tab: str) -> None:
         self.state.update(lambda prev: {"ui": dataclasses.replace(prev.ui, active_tab=tab)})
+        self.logger.set_page_type(tab)
 
     def toggle_sidebar(self) -> None:
         self.state.update(lambda prev: {"ui": dataclasses.replace(prev.ui, sidebar_open=not prev.ui.sidebar_open)})

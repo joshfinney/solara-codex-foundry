@@ -25,6 +25,7 @@ llm_key = "cyberark://llm_primary"
 embeddings_model = "text-embedding"
 embeddings_key = "cyberark://embedding_primary"
 mlflow_enabled = true
+logstash_endpoints = ["https://logs.dev"]
 """
     )
 
@@ -60,6 +61,7 @@ mlflow_enabled = true
     assert runtime.environment_key == "uat"
     assert runtime.dataset_key == "datasets/issuance.csv"
     assert runtime.public_config()["mlflow_enabled"] is True
+    assert runtime.logstash_endpoints == ("https://logs.dev",)
 
     storage_creds = credentials.load_storage_credentials(config)
     assert storage_creds is not None

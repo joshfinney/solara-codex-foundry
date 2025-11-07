@@ -7,7 +7,31 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable
+from typing import Any, Callable, Dict, Iterable, Sequence
+
+
+@dataclass(slots=True)
+class _LogContext:
+    project_name: str
+    environment: str
+    region: str
+    user_id: str | None
+    page_type: str
+
+    @classmethod
+    def default_from_environment(cls) -> "_LogContext":
+        project = os.getenv("PRIMARY_CREDIT_APP_NAME", "primary-credit")
+        environment = os.getenv("PRIMARY_CREDIT_ENVIRONMENT_KEY", "local").lower()
+        region = os.getenv("PRIMARY_CREDIT_REGION", "us-east-1").upper()
+        user_id = os.getenv("PRIMARY_CREDIT_UID")
+        return cls(project, environment, region, user_id, "new_issue")
+
+
+class _Unset:
+    pass
+
+
+_UNSET = _Unset()
 
 
 @dataclass
@@ -50,8 +74,9 @@ class StructuredLogger:
         self._logger.setLevel(logging.INFO)
         self._console_enabled = os.getenv("PRIMARY_CREDIT_DISABLE_CONSOLE_LOGS", "0") != "1"
         self._console_format = os.getenv("PRIMARY_CREDIT_LOG_FORMAT", "human").lower()
-        self._opensearch_endpoint = os.getenv("PRIMARY_CREDIT_LOG_OPENSEARCH_URL")
-        self._logstash_endpoint = os.getenv("PRIMARY_CREDIT_LOG_LOGSTASH_URL")
+        self._context = _LogContext.default_from_environment()
+        endpoint = os.getenv("PRIMARY_CREDIT_LOG_LOGSTASH_URL")
+        self._logstash_endpoints: tuple[str, ...] = (endpoint,) if endpoint else ()
 
     def log(self, event: str, *, severity: str = "info", message: str | None = None, **fields: Any) -> None:
         payload = LogEvent(event=event, severity=severity, message=message, fields=fields)
@@ -66,6 +91,45 @@ class StructuredLogger:
     def error(self, event: str, **fields: Any) -> None:
         self.log(event, severity="error", **fields)
 
+    # ------------------------------------------------------------------ context configuration
+    def configure_context(
+        self,
+        *,
+        project_name: str | None = None,
+        environment: str | None = None,
+        region: str | None = None,
+        user_id: str | None | _Unset = _UNSET,
+        page_type: str | None = None,
+    ) -> None:
+        if project_name is not None:
+            self._context.project_name = project_name
+        if environment is not None:
+            self._context.environment = environment.lower()
+        if region is not None:
+            self._context.region = region.upper()
+        if user_id is not _UNSET:
+            self._context.user_id = user_id
+        if page_type is not None:
+            self._context.page_type = page_type
+
+    def configure_logstash_endpoints(self, endpoints: Sequence[str]) -> None:
+        unique: list[str] = []
+        for endpoint in endpoints:
+            trimmed = endpoint.strip()
+            if not trimmed:
+                continue
+            if trimmed not in unique:
+                unique.append(trimmed)
+        self._logstash_endpoints = tuple(unique)
+        if self._logstash_endpoints:
+            self._logger.setLevel(min(self._logger.level, logging.DEBUG))
+
+    def set_page_type(self, page_type: str) -> None:
+        self._context.page_type = page_type
+
+    def set_user_id(self, user_id: str | None) -> None:
+        self._context.user_id = user_id
+
     # ------------------------------------------------------------------ internals
     def _emit(self, event: LogEvent) -> None:
         record = event.to_dict()
@@ -73,7 +137,7 @@ class StructuredLogger:
             self._emit_console(record)
         for sink in self._iter_external_sinks():
             try:
-                sink(record)
+                sink(dict(record))
             except Exception:  # pragma: no cover - defensive
                 self._logger.exception("Failed to emit structured log", extra={"event": record})
 
@@ -87,11 +151,9 @@ class StructuredLogger:
             human = self._format_human(record)
             self._logger.log(level, human)
 
-    def _iter_external_sinks(self) -> Iterable:
-        if self._opensearch_endpoint:
-            yield self._emit_opensearch
-        if self._logstash_endpoint:
-            yield self._emit_logstash
+    def _iter_external_sinks(self) -> Iterable[Callable[[Dict[str, Any]], None]]:
+        for endpoint in self._logstash_endpoints:
+            yield lambda payload, endpoint=endpoint: self._emit_logstash(endpoint, payload)
 
     @staticmethod
     def _severity_to_level(severity: str) -> int:
@@ -131,11 +193,24 @@ class StructuredLogger:
             return str(value)
         return str(value)
 
-    def _emit_opensearch(self, payload: Dict[str, Any]) -> None:
-        # In this environment we avoid performing network calls. Instead we log
-        # a diagnostic entry that could be replaced with a real OpenSearch
-        # client in production.
-        self._logger.debug("[OpenSearch] %s", json.dumps(payload))
-
-    def _emit_logstash(self, payload: Dict[str, Any]) -> None:
-        self._logger.debug("[Logstash] %s", json.dumps(payload))
+    def _emit_logstash(self, endpoint: str, payload: Dict[str, Any]) -> None:
+        record = dict(payload)
+        event_type = record.pop("event_type", record.get("event"))
+        page_type = record.pop("page_type", self._context.page_type)
+        conversation_id = record.get("conversation_id")
+        user_id = record.pop("user_id", self._context.user_id)
+        event_data = record.pop("event_data", None)
+        ignore_keys = {"timestamp", "event", "severity", "component", "message"}
+        if event_data is None:
+            event_data = {key: value for key, value in record.items() if key not in ignore_keys}
+        body = {
+            "project_name": self._context.project_name,
+            "environment": self._context.environment,
+            "region": self._context.region,
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "event_type": event_type,
+            "page_type": page_type,
+            "event_data": event_data,
+        }
+        self._logger.debug("[Logstash:%s] %s", endpoint, json.dumps(body, default=str))

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Callable, Dict
 
@@ -53,11 +52,12 @@ def create_controller() -> AppController:
         attestation_store=attestation.FileAttestationStore(ATTESTATION_FILE),
         prompt_categories=load_prompt_suggestions(),
     )
-    storage_client = StorageClient(logger, bucket=os.getenv("PRIMARY_CREDIT_S3_BUCKET"))
+    storage_client = StorageClient(logger)
     return AppController(
         chat_controller=chat_controller,
         logger=logger,
         storage_client=storage_client,
+        execution_root=PROJECT_ROOT,
     )
 
 

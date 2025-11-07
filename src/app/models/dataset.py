@@ -11,7 +11,11 @@ from typing import TYPE_CHECKING, Any, Dict
 class BootstrapResult:
     """Result of the initial bootstrap handshake."""
 
+    config: "QRExecConfig"
     credentials: "RuntimeCredentials"
+    storage: "StorageCredentials | None" = None
+    llm: "LLMParameters | None" = None
+    embeddings: "EmbeddingParameters | None" = None
 
     def public_config(self) -> Dict[str, str]:
         return self.credentials.public_config()
@@ -61,9 +65,19 @@ class InlineFeedback:
 
 
 if TYPE_CHECKING:  # pragma: no cover - mypy only
-    from app.services.credentials import RuntimeCredentials
+    from app.services.credentials import (
+        EmbeddingParameters,
+        LLMParameters,
+        QRExecConfig,
+        RuntimeCredentials,
+        StorageCredentials,
+    )
     import pandas as pd  # type: ignore
 else:  # pragma: no cover - runtime safe fallbacks
+    EmbeddingParameters = "EmbeddingParameters"  # type: ignore[valid-type]
+    LLMParameters = "LLMParameters"  # type: ignore[valid-type]
+    QRExecConfig = "QRExecConfig"  # type: ignore[valid-type]
     RuntimeCredentials = "RuntimeCredentials"  # type: ignore[valid-type]
+    StorageCredentials = "StorageCredentials"  # type: ignore[valid-type]
     pd = None  # type: ignore
 

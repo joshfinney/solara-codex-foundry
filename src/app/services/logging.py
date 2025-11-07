@@ -49,6 +49,7 @@ class StructuredLogger:
             self._logger.addHandler(handler)
         self._logger.setLevel(logging.INFO)
         self._console_enabled = os.getenv("PRIMARY_CREDIT_DISABLE_CONSOLE_LOGS", "0") != "1"
+        self._console_format = os.getenv("PRIMARY_CREDIT_LOG_FORMAT", "human").lower()
         self._opensearch_endpoint = os.getenv("PRIMARY_CREDIT_LOG_OPENSEARCH_URL")
         self._logstash_endpoint = os.getenv("PRIMARY_CREDIT_LOG_LOGSTASH_URL")
 
@@ -69,18 +70,66 @@ class StructuredLogger:
     def _emit(self, event: LogEvent) -> None:
         record = event.to_dict()
         if self._console_enabled:
-            self._logger.info(json.dumps(record))
+            self._emit_console(record)
         for sink in self._iter_external_sinks():
             try:
                 sink(record)
             except Exception:  # pragma: no cover - defensive
                 self._logger.exception("Failed to emit structured log", extra={"event": record})
 
+    # ------------------------------------------------------------------ formatting helpers
+    def _emit_console(self, record: Dict[str, Any]) -> None:
+        fmt = self._console_format
+        level = self._severity_to_level(record.get("severity", "info"))
+        if fmt in {"json", "both"}:
+            self._logger.log(level, json.dumps(record))
+        if fmt in {"human", "both"}:
+            human = self._format_human(record)
+            self._logger.log(level, human)
+
     def _iter_external_sinks(self) -> Iterable:
         if self._opensearch_endpoint:
             yield self._emit_opensearch
         if self._logstash_endpoint:
             yield self._emit_logstash
+
+    @staticmethod
+    def _severity_to_level(severity: str) -> int:
+        mapping = {
+            "debug": logging.DEBUG,
+            "info": logging.INFO,
+            "warning": logging.WARNING,
+            "error": logging.ERROR,
+            "critical": logging.CRITICAL,
+        }
+        return mapping.get(severity.lower(), logging.INFO)
+
+    def _format_human(self, record: Dict[str, Any]) -> str:
+        data = dict(record)
+        timestamp = data.pop("timestamp", "-")
+        event = data.pop("event", "unknown")
+        severity = data.pop("severity", "info").upper()
+        component = data.pop("component", "")
+        message = data.pop("message", None)
+        fields = " ".join(
+            f"{key}={self._format_field_value(value)}" for key, value in sorted(data.items())
+        )
+        parts = [f"[{timestamp}]", severity, event]
+        if component:
+            parts.append(f"({component})")
+        if message:
+            parts.append(f"- {message}")
+        if fields:
+            parts.append(f"- {fields}")
+        return " ".join(part for part in parts if part)
+
+    @staticmethod
+    def _format_field_value(value: Any) -> str:
+        if isinstance(value, bool):
+            return str(value).lower()
+        if isinstance(value, (int, float)):
+            return str(value)
+        return str(value)
 
     def _emit_opensearch(self, payload: Dict[str, Any]) -> None:
         # In this environment we avoid performing network calls. Instead we log
